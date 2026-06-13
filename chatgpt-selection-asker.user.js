@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Selection Asker
 // @namespace    https://github.com/st747/chatgpt-selection-asker
-// @version      0.1.1
+// @version      0.1.2
 // @description  Select text on a webpage, right-click, and send it to ChatGPT as a prefilled prompt.
 // @author       st747
 // @match        *://*/*
@@ -9,6 +9,7 @@
 // @exclude      https://chat.openai.com/*
 // @grant        GM_openInTab
 // @grant        GM_registerMenuCommand
+// @grant        GM_setClipboard
 // @run-at       document-start
 // ==/UserScript==
 
@@ -16,9 +17,7 @@
   "use strict";
 
   const CHATGPT_URL = "https://chatgpt.com/";
-  const MAX_PROMPT_LENGTH = 8000;
-  const TRIM_NOTICE =
-    "\n\n[Selection was longer than 8000 characters and has been trimmed.]";
+  const MAX_PREFILL_URL_LENGTH = 2000;
   const MENU_ID = "chatgpt-selection-asker-menu-host";
 
   let selectedText = "";
@@ -93,24 +92,13 @@
     return "";
   }
 
-  function buildPrompt(text) {
-    if (text.length <= MAX_PROMPT_LENGTH) {
-      return text;
-    }
-
-    const allowedTextLength = MAX_PROMPT_LENGTH - TRIM_NOTICE.length;
-    return `${text.slice(0, Math.max(0, allowedTextLength)).trimEnd()}${TRIM_NOTICE}`;
-  }
-
   function buildChatGptUrl(prompt) {
     const url = new URL(CHATGPT_URL);
     url.searchParams.set("q", prompt);
     return url.toString();
   }
 
-  function openChatGpt(prompt) {
-    const targetUrl = buildChatGptUrl(prompt);
-
+  function openChatGptUrl(targetUrl) {
     if (typeof GM_openInTab === "function") {
       GM_openInTab(targetUrl, {
         active: true,
@@ -123,6 +111,66 @@
     window.open(targetUrl, "_blank", "noopener,noreferrer");
   }
 
+  function canPrefillWithUrl(text) {
+    return buildChatGptUrl(text).length <= MAX_PREFILL_URL_LENGTH;
+  }
+
+  function copyToClipboard(text) {
+    if (typeof GM_setClipboard === "function") {
+      GM_setClipboard(text, "text");
+      return true;
+    }
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      navigator.clipboard.writeText(text).catch(() => {});
+      return true;
+    }
+
+    return false;
+  }
+
+  function notify(message) {
+    const toast = document.createElement("div");
+    toast.textContent = message;
+    toast.style.position = "fixed";
+    toast.style.right = "16px";
+    toast.style.bottom = "16px";
+    toast.style.zIndex = "2147483647";
+    toast.style.maxWidth = "min(420px, calc(100vw - 32px))";
+    toast.style.padding = "10px 12px";
+    toast.style.border = "1px solid rgba(125, 125, 125, 0.28)";
+    toast.style.borderRadius = "8px";
+    toast.style.background = "Canvas";
+    toast.style.color = "CanvasText";
+    toast.style.boxShadow =
+      "0 14px 40px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12)";
+    toast.style.font =
+      '14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+    document.documentElement.append(toast);
+    window.setTimeout(() => {
+      toast.remove();
+    }, 4200);
+  }
+
+  function sendTextToChatGpt(text) {
+    if (canPrefillWithUrl(text)) {
+      openChatGptUrl(buildChatGptUrl(text));
+      return "prefill";
+    }
+
+    const copied = copyToClipboard(text);
+    openChatGptUrl(CHATGPT_URL);
+
+    if (copied) {
+      notify("Selection copied. Paste it into ChatGPT to avoid URL length limits.");
+    } else {
+      notify("ChatGPT opened, but clipboard access failed. Copy the selection manually.");
+    }
+
+    return copied ? "clipboard" : "clipboard-failed";
+  }
+
   function openSelectedTextInChatGpt() {
     const text = getCurrentOrRecentSelection();
 
@@ -130,7 +178,7 @@
       return false;
     }
 
-    openChatGpt(buildPrompt(text));
+    sendTextToChatGpt(text);
     return true;
   }
 
@@ -253,11 +301,13 @@
     const button = document.createElement("button");
     button.type = "button";
     button.setAttribute("role", "menuitem");
-    button.innerHTML = 'Ask ChatGPT<span class="hint">Open with selected text</span>';
+    button.innerHTML = canPrefillWithUrl(selectedText)
+      ? 'Ask ChatGPT<span class="hint">Open with selected text</span>'
+      : 'Copy and open ChatGPT<span class="hint">Paste manually in ChatGPT</span>';
     button.addEventListener("click", () => {
-      const prompt = buildPrompt(selectedText);
+      const text = selectedText;
       dismissMenu();
-      openChatGpt(prompt);
+      sendTextToChatGpt(text);
     });
 
     menu.append(button);
