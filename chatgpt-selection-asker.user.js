@@ -1,15 +1,17 @@
 // ==UserScript==
 // @name         ChatGPT Selection Asker
 // @namespace    https://github.com/st747/chatgpt-selection-asker
-// @version      0.1.3
+// @version      0.1.4
 // @description  Select text on a webpage, right-click, and send it to ChatGPT as a prefilled prompt.
 // @author       st747
 // @match        *://*/*
-// @exclude      https://chatgpt.com/*
 // @exclude      https://chat.openai.com/*
 // @grant        GM_openInTab
 // @grant        GM_registerMenuCommand
 // @grant        GM_setClipboard
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_deleteValue
 // @run-at       document-start
 // ==/UserScript==
 
@@ -18,6 +20,12 @@
 
   const CHATGPT_URL = "https://chatgpt.com/";
   const MAX_PREFILL_URL_LENGTH = 2000;
+  const PENDING_TEXT_KEY = "pendingChatGptSelectionText";
+  const PENDING_TEXT_CREATED_AT_KEY = "pendingChatGptSelectionCreatedAt";
+  const PENDING_TEXT_TTL_MS = 5 * 60 * 1000;
+  const PROMPT_WAIT_TIMEOUT_MS = 15000;
+  const PROMPT_SELECTOR =
+    '#prompt-textarea, textarea, [contenteditable="true"][role="textbox"], [contenteditable="true"]';
 
   let lastSelectionText = "";
   let lastSelectionAt = 0;
@@ -124,6 +132,45 @@
     return false;
   }
 
+  function setPendingChatGptText(text) {
+    if (typeof GM_setValue !== "function") {
+      return false;
+    }
+
+    GM_setValue(PENDING_TEXT_KEY, text);
+    GM_setValue(PENDING_TEXT_CREATED_AT_KEY, Date.now());
+    return true;
+  }
+
+  function getPendingChatGptText() {
+    if (typeof GM_getValue !== "function") {
+      return "";
+    }
+
+    const text = GM_getValue(PENDING_TEXT_KEY, "");
+    const createdAt = GM_getValue(PENDING_TEXT_CREATED_AT_KEY, 0);
+
+    if (!text) {
+      return "";
+    }
+
+    if (!createdAt || Date.now() - createdAt > PENDING_TEXT_TTL_MS) {
+      clearPendingChatGptText();
+      return "";
+    }
+
+    return text;
+  }
+
+  function clearPendingChatGptText() {
+    if (typeof GM_deleteValue !== "function") {
+      return;
+    }
+
+    GM_deleteValue(PENDING_TEXT_KEY);
+    GM_deleteValue(PENDING_TEXT_CREATED_AT_KEY);
+  }
+
   function notify(message) {
     const toast = document.createElement("div");
     toast.textContent = message;
@@ -154,16 +201,15 @@
       return "prefill";
     }
 
-    const copied = copyToClipboard(text);
+    const stored = setPendingChatGptText(text);
     openChatGptUrl(CHATGPT_URL);
 
-    if (copied) {
-      notify("Selection copied. Paste it into ChatGPT to avoid URL length limits.");
-    } else {
-      notify("ChatGPT opened, but clipboard access failed. Copy the selection manually.");
+    if (!stored) {
+      copyToClipboard(text);
+      notify("ChatGPT opened, but temporary storage failed. Paste the copied text manually.");
     }
 
-    return copied ? "clipboard" : "clipboard-failed";
+    return stored ? "stored" : "storage-failed";
   }
 
   function openSelectedTextInChatGpt() {
@@ -177,9 +223,90 @@
     return true;
   }
 
-  document.addEventListener("selectionchange", rememberSelection, true);
-  document.addEventListener("mouseup", rememberSelection, true);
-  document.addEventListener("keyup", rememberSelection, true);
+  function isChatGptPage() {
+    return location.hostname === "chatgpt.com";
+  }
+
+  function waitForPromptInput() {
+    return new Promise((resolve) => {
+      const startedAt = Date.now();
+      const timer = window.setInterval(() => {
+        const input = document.querySelector(PROMPT_SELECTOR);
+
+        if (input) {
+          window.clearInterval(timer);
+          resolve(input);
+          return;
+        }
+
+        if (Date.now() - startedAt > PROMPT_WAIT_TIMEOUT_MS) {
+          window.clearInterval(timer);
+          resolve(null);
+        }
+      }, 250);
+    });
+  }
+
+  function dispatchInputEvents(element) {
+    element.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function fillPromptInput(input, text) {
+    input.focus();
+
+    if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(input),
+        "value",
+      )?.set;
+
+      if (valueSetter) {
+        valueSetter.call(input, text);
+      } else {
+        input.value = text;
+      }
+
+      dispatchInputEvents(input);
+      return input.value === text;
+    }
+
+    if (input.isContentEditable) {
+      input.textContent = text;
+      dispatchInputEvents(input);
+      return input.textContent === text;
+    }
+
+    return false;
+  }
+
+  async function fillPendingTextOnChatGpt() {
+    const text = getPendingChatGptText();
+
+    if (!text) {
+      return;
+    }
+
+    const input = await waitForPromptInput();
+
+    if (input && fillPromptInput(input, text)) {
+      clearPendingChatGptText();
+      notify("Selection inserted into ChatGPT. Review it before sending.");
+      return;
+    }
+
+    copyToClipboard(text);
+    clearPendingChatGptText();
+    notify("Could not find the ChatGPT input box. Text was copied; press Ctrl+V to paste.");
+  }
+
+  if (isChatGptPage()) {
+    fillPendingTextOnChatGpt();
+  } else {
+    document.addEventListener("selectionchange", rememberSelection, true);
+    document.addEventListener("mouseup", rememberSelection, true);
+    document.addEventListener("keyup", rememberSelection, true);
+  }
 
   if (typeof GM_registerMenuCommand === "function") {
     GM_registerMenuCommand("Ask ChatGPT with selected text", () => {
