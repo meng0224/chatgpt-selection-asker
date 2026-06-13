@@ -1,14 +1,15 @@
 // ==UserScript==
 // @name         ChatGPT Selection Asker
 // @namespace    https://github.com/st747/chatgpt-selection-asker
-// @version      0.1.0
+// @version      0.1.1
 // @description  Select text on a webpage, right-click, and send it to ChatGPT as a prefilled prompt.
 // @author       st747
 // @match        *://*/*
 // @exclude      https://chatgpt.com/*
 // @exclude      https://chat.openai.com/*
 // @grant        GM_openInTab
-// @run-at       document-idle
+// @grant        GM_registerMenuCommand
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
@@ -21,10 +22,19 @@
   const MENU_ID = "chatgpt-selection-asker-menu-host";
 
   let selectedText = "";
+  let lastSelectionText = "";
+  let lastSelectionAt = 0;
   let menuHost = null;
   let removeDismissListeners = null;
+  const handledContextMenuEvents = new WeakSet();
 
   function getSelectedText() {
+    const inputSelection = getFocusedInputSelection();
+
+    if (inputSelection) {
+      return inputSelection;
+    }
+
     const selection = window.getSelection();
 
     if (!selection || selection.rangeCount === 0) {
@@ -32,6 +42,55 @@
     }
 
     return selection.toString().trim();
+  }
+
+  function getFocusedInputSelection() {
+    const activeElement = document.activeElement;
+
+    if (
+      !activeElement ||
+      !["INPUT", "TEXTAREA"].includes(activeElement.tagName) ||
+      typeof activeElement.selectionStart !== "number" ||
+      typeof activeElement.selectionEnd !== "number"
+    ) {
+      return "";
+    }
+
+    const start = activeElement.selectionStart;
+    const end = activeElement.selectionEnd;
+
+    if (start === end) {
+      return "";
+    }
+
+    return activeElement.value.slice(start, end).trim();
+  }
+
+  function rememberSelection() {
+    const text = getSelectedText();
+
+    if (!text) {
+      return;
+    }
+
+    lastSelectionText = text;
+    lastSelectionAt = Date.now();
+  }
+
+  function getCurrentOrRecentSelection() {
+    const text = getSelectedText();
+
+    if (text) {
+      lastSelectionText = text;
+      lastSelectionAt = Date.now();
+      return text;
+    }
+
+    if (lastSelectionText && Date.now() - lastSelectionAt < 30000) {
+      return lastSelectionText;
+    }
+
+    return "";
   }
 
   function buildPrompt(text) {
@@ -62,6 +121,17 @@
     }
 
     window.open(targetUrl, "_blank", "noopener,noreferrer");
+  }
+
+  function openSelectedTextInChatGpt() {
+    const text = getCurrentOrRecentSelection();
+
+    if (!text) {
+      return false;
+    }
+
+    openChatGpt(buildPrompt(text));
+    return true;
   }
 
   function dismissMenu() {
@@ -200,21 +270,52 @@
     button.focus({ preventScroll: true });
   }
 
-  document.addEventListener(
-    "contextmenu",
-    (event) => {
-      const text = getSelectedText();
+  function handleContextMenu(event) {
+    if (handledContextMenuEvents.has(event)) {
+      return;
+    }
 
-      if (!text) {
-        dismissMenu();
-        return;
-      }
+    handledContextMenuEvents.add(event);
 
-      selectedText = text;
+    const text = getCurrentOrRecentSelection();
+
+    if (!text) {
+      dismissMenu();
+      return;
+    }
+
+    selectedText = text;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    createMenu(event.clientX, event.clientY);
+  }
+
+  function handleShortcut(event) {
+    if (!event.altKey || event.shiftKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    if (event.key.toLowerCase() !== "g") {
+      return;
+    }
+
+    if (openSelectedTextInChatGpt()) {
       event.preventDefault();
       event.stopPropagation();
-      createMenu(event.clientX, event.clientY);
-    },
-    true,
-  );
+    }
+  }
+
+  window.addEventListener("contextmenu", handleContextMenu, true);
+  document.addEventListener("contextmenu", handleContextMenu, true);
+  document.addEventListener("selectionchange", rememberSelection, true);
+  document.addEventListener("mouseup", rememberSelection, true);
+  document.addEventListener("keyup", rememberSelection, true);
+  document.addEventListener("keydown", handleShortcut, true);
+
+  if (typeof GM_registerMenuCommand === "function") {
+    GM_registerMenuCommand("Ask ChatGPT with selected text", () => {
+      openSelectedTextInChatGpt();
+    });
+  }
 })();
