@@ -1,41 +1,53 @@
 # chatgpt-selection-asker
 
-一個 Tampermonkey userscript，可以把網頁上選取的文字送到 ChatGPT。
+English | [繁體中文](README_zhtw.md)
 
-在網頁上選取文字後，按右鍵，選擇 `Tampermonkey` →
-`Ask ChatGPT with selected text`，腳本會開啟新的 ChatGPT 分頁，並把選取的
-文字預先填入提問欄。腳本不會自動送出訊息，你可以先檢查或修改內容，
-再自行送出。
+A Tampermonkey userscript that sends selected text from any webpage to ChatGPT as a prefilled prompt.
 
-如果選取內容太長，腳本會暫存完整文字並開啟 ChatGPT 首頁，接著自動把
-文字填入 ChatGPT 輸入框，避免網址太長造成 `HTTP ERROR 431`。
+After selecting text on a webpage, right-click and choose `Tampermonkey` -> `Ask ChatGPT with selected text`. The script opens a new ChatGPT tab and places the selected text into the prompt box for you.
 
-## 安裝
+The script does not submit the message automatically. You can review, edit, or cancel the prompt before sending it yourself.
 
-1. 在瀏覽器安裝 [Tampermonkey](https://www.tampermonkey.net/)。
-2. 開啟 `chatgpt-selection-asker.user.js`，或在 Tampermonkey 建立新腳本，
-   並貼上該檔案的內容。
-3. 儲存並啟用腳本。
+## Features
 
-## 使用方式
+- Sends selected webpage text to ChatGPT from the Tampermonkey context menu.
+- Prefills the ChatGPT prompt without automatically submitting it.
+- Supports text selected inside regular pages, inputs, and textareas.
+- Handles long selections without cutting them off.
+- Falls back to the clipboard if ChatGPT's interface changes and automatic filling fails.
+- Does not store API keys, chat history, or user data.
 
-1. 在一般網頁上選取文字。
-2. 對選取的文字按右鍵。
-3. 選擇 `Tampermonkey`。
-4. 選擇 `Ask ChatGPT with selected text`。
-5. 在 ChatGPT 檢查預先填入的提問內容，確認後再送出。
+## Installation
 
-## 注意事項
+1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser.
+2. Open [`chatgpt-selection-asker.user.js`](chatgpt-selection-asker.user.js), or create a new userscript in Tampermonkey and paste the file contents.
+3. Save and enable the script.
 
-- 腳本不會攔截網站的右鍵選單，只會註冊 Tampermonkey 子選單項目。
-- 腳本會在 ChatGPT 頁面讀取暫存文字並嘗試填入輸入框，不會自動送出訊息。
-- 選取內容太長時，不會裁切文字；填入成功後會清除暫存內容。
-- 如果 ChatGPT 介面變更導致自動填入失敗，腳本會改把文字複製到剪貼簿，
-  並提示你按 `Ctrl+V` 手動貼上。
-- 腳本不會儲存 API key、歷史紀錄或任何使用者資料。
-- 有些網站會強制處理選取行為。如果送出的內容不是剛剛選取的文字，請重新
-  選取一次後再使用 Tampermonkey 子選單。
+## Usage
 
-## 授權
+1. Select text on a normal webpage.
+2. Right-click the selected text.
+3. Choose `Tampermonkey`.
+4. Choose `Ask ChatGPT with selected text`.
+5. Review the prefilled ChatGPT prompt, then send it manually when ready.
+
+## Long Text Handling
+
+For short selections, the script opens ChatGPT with the selected text in the URL query.
+
+If the selected text is too long, the script temporarily stores the full text and opens the ChatGPT homepage instead. It then tries to fill the ChatGPT input box automatically. This avoids browser or server errors such as `HTTP ERROR 431` caused by overly long URLs.
+
+Temporary text is cleared after it is successfully filled, after it expires, or after the fallback flow copies it to the clipboard.
+
+## Notes
+
+- The script does not replace or intercept a website's native right-click menu. It only registers a Tampermonkey menu command.
+- The script reads temporarily stored text on ChatGPT pages and tries to place it into the prompt box.
+- The script never sends the prompt automatically.
+- Long selections are not truncated.
+- If automatic filling fails because the ChatGPT interface changed, the script copies the text to the clipboard and asks you to press `Ctrl+V` manually.
+- Some websites aggressively manage text selection. If the text sent to ChatGPT is not the text you just selected, select it again and use the Tampermonkey menu once more.
+
+## License
 
 MIT
