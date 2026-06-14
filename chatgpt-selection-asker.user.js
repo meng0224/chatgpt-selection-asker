@@ -3,7 +3,7 @@
 // @namespace    https://github.com/meng0224/chatgpt-selection-asker
 // @version      0.1.4
 // @description  Select text on a webpage, right-click, and send it to ChatGPT as a prefilled prompt.
-// @author       st747
+// @author       meng0224
 // @match        *://*/*
 // @exclude      https://chat.openai.com/*
 // @grant        GM_openInTab
