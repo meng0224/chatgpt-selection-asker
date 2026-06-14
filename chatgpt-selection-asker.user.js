@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ChatGPT Selection Asker
-// @namespace    https://github.com/meng0224chatgpt-selection-asker
+// @namespace    https://github.com/meng0224/chatgpt-selection-asker
 // @version      0.1.4
 // @description  Select text on a webpage, right-click, and send it to ChatGPT as a prefilled prompt.
 // @author       st747
