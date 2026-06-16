@@ -15,7 +15,7 @@ The script does not submit the message automatically. You can review, edit, or c
 - Supports text selected inside regular pages, inputs, and textareas.
 - Handles long selections without cutting them off.
 - Falls back to the clipboard if ChatGPT's interface changes and automatic filling fails.
-- Does not store API keys, chat history, or user data.
+- Does not store API keys, chat history, or user data long term. Selected text is only kept temporarily in local Tampermonkey storage so the newly opened ChatGPT tab can fill the prompt.
 
 ## Installation
 
@@ -31,17 +31,18 @@ The script does not submit the message automatically. You can review, edit, or c
 4. Choose `Ask ChatGPT with selected text`.
 5. Review the prefilled ChatGPT prompt, then send it manually when ready.
 
-## Long Text Handling
+## Text Handling
 
-For short selections, the script opens ChatGPT with the selected text in the URL query.
+The script does not place selected text in the ChatGPT URL query. This avoids exposing the selected text through browser history, tab history, or the request sent to `chatgpt.com`.
 
-If the selected text is too long, the script temporarily stores the full text and opens ChatGPT with a one-time token in the URL fragment. Only that automatically opened ChatGPT tab can consume the stored text. This avoids browser or server errors such as `HTTP ERROR 431` caused by overly long URLs.
+For every selection, the script temporarily stores the full text in local Tampermonkey storage and opens ChatGPT with a one-time token in the URL fragment. Only that automatically opened ChatGPT tab can consume the stored text. This also avoids browser or server errors such as `HTTP ERROR 431` caused by overly long URLs.
 
 Temporary text is cleared after it is successfully filled, after it expires, after the fallback flow copies it to the clipboard, or when a manually opened ChatGPT tab sees leftover temporary text without the matching token.
 
 ## Notes
 
 - The script does not replace or intercept a website's native right-click menu. It only registers a Tampermonkey menu command.
+- The userscript uses `@match *://*/*` so the Tampermonkey menu command can work on most webpages. It only reads the current or recently selected text when you trigger `Ask ChatGPT with selected text`.
 - The script only reads temporarily stored text on the automatically opened ChatGPT tab with the matching one-time token.
 - If you manually open a new ChatGPT tab later, leftover temporary text is cleared instead of being filled into the prompt box.
 - The script never sends the prompt automatically.
@@ -51,4 +52,4 @@ Temporary text is cleared after it is successfully filled, after it expires, aft
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

@@ -24,7 +24,6 @@
   "use strict";
 
   const CHATGPT_URL = "https://chatgpt.com/";
-  const MAX_PREFILL_URL_LENGTH = 2000;
   const PENDING_TEXT_KEY = "pendingChatGptSelectionText";
   const PENDING_TEXT_CREATED_AT_KEY = "pendingChatGptSelectionCreatedAt";
   const PENDING_TEXT_TOKEN_KEY = "pendingChatGptSelectionToken";
@@ -102,12 +101,6 @@
     return "";
   }
 
-  function buildChatGptUrl(prompt) {
-    const url = new URL(CHATGPT_URL);
-    url.searchParams.set("q", prompt);
-    return url.toString();
-  }
-
   function buildPendingChatGptUrl(token) {
     const url = new URL(CHATGPT_URL);
     url.hash = `${PENDING_TEXT_FRAGMENT_PREFIX}${encodeURIComponent(token)}`;
@@ -125,10 +118,6 @@
     }
 
     window.open(targetUrl, "_blank", "noopener,noreferrer");
-  }
-
-  function canPrefillWithUrl(text) {
-    return buildChatGptUrl(text).length <= MAX_PREFILL_URL_LENGTH;
   }
 
   function createPendingChatGptToken() {
@@ -248,11 +237,6 @@
   }
 
   function sendTextToChatGpt(text) {
-    if (canPrefillWithUrl(text)) {
-      openChatGptUrl(buildChatGptUrl(text));
-      return "prefill";
-    }
-
     const token = setPendingChatGptText(text);
     openChatGptUrl(token ? buildPendingChatGptUrl(token) : CHATGPT_URL);
 

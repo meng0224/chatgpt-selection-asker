@@ -15,7 +15,7 @@
 - 支援一般網頁、輸入框與文字區塊中的選取內容。
 - 選取內容太長時不會裁切文字。
 - 如果 ChatGPT 介面變更導致自動填入失敗，會改把文字複製到剪貼簿。
-- 不儲存 API key、聊天紀錄或任何使用者資料。
+- 不長期儲存 API key、聊天紀錄或使用者資料。選取文字只會短暫保存在本機 Tampermonkey storage，供新開啟的 ChatGPT 分頁填入提問欄。
 
 ## 安裝
 
@@ -31,17 +31,18 @@
 4. 選擇 `Ask ChatGPT with selected text`。
 5. 在 ChatGPT 檢查預先填入的提問內容，確認後再手動送出。
 
-## 長文字處理
+## 文字處理
 
-選取內容較短時，腳本會透過網址參數開啟 ChatGPT，讓文字直接出現在提問欄。
+腳本不會把選取文字放進 ChatGPT 的 URL query。這可以避免選取內容出現在瀏覽器歷史、分頁紀錄，或傳送到 `chatgpt.com` 的請求網址中。
 
-如果選取內容太長，腳本會暫存完整文字，並用一次性 token 開啟 ChatGPT。只有那個由腳本自動開啟、token 相符的 ChatGPT 分頁可以取用暫存文字。這可以避免網址太長造成瀏覽器或伺服器錯誤，例如 `HTTP ERROR 431`。
+每次選取文字後，腳本都會把完整文字暫存在本機 Tampermonkey storage，並用一次性 token 開啟 ChatGPT。只有那個由腳本自動開啟、token 相符的 ChatGPT 分頁可以取用暫存文字。這也可以避免網址太長造成瀏覽器或伺服器錯誤，例如 `HTTP ERROR 431`。
 
 暫存文字會在成功填入、過期、fallback 流程複製到剪貼簿後清除；如果之後手動開啟新的 ChatGPT 分頁，腳本會清掉殘留暫存，而不會再把舊內容填進輸入框。
 
 ## 注意事項
 
 - 腳本不會取代或攔截網站原本的右鍵選單，只會註冊 Tampermonkey 選單命令。
+- userscript 使用 `@match *://*/*`，讓 Tampermonkey 選單命令可以在多數網頁使用。它只會在你觸發 `Ask ChatGPT with selected text` 時讀取目前或最近一次選取的文字。
 - 腳本只會在 token 相符的自動開啟 ChatGPT 分頁讀取暫存文字並嘗試填入提問欄。
 - 如果手動開啟新的 ChatGPT 分頁，殘留暫存會被清掉，不會填入舊內容。
 - 腳本不會自動送出訊息。
@@ -51,4 +52,4 @@
 
 ## 授權
 
-MIT
+MIT。詳見 [LICENSE](LICENSE)。
