@@ -35,14 +35,15 @@ The script does not submit the message automatically. You can review, edit, or c
 
 For short selections, the script opens ChatGPT with the selected text in the URL query.
 
-If the selected text is too long, the script temporarily stores the full text and opens the ChatGPT homepage instead. It then tries to fill the ChatGPT input box automatically. This avoids browser or server errors such as `HTTP ERROR 431` caused by overly long URLs.
+If the selected text is too long, the script temporarily stores the full text and opens ChatGPT with a one-time token in the URL fragment. Only that automatically opened ChatGPT tab can consume the stored text. This avoids browser or server errors such as `HTTP ERROR 431` caused by overly long URLs.
 
-Temporary text is cleared after it is successfully filled, after it expires, or after the fallback flow copies it to the clipboard.
+Temporary text is cleared after it is successfully filled, after it expires, after the fallback flow copies it to the clipboard, or when a manually opened ChatGPT tab sees leftover temporary text without the matching token.
 
 ## Notes
 
 - The script does not replace or intercept a website's native right-click menu. It only registers a Tampermonkey menu command.
-- The script reads temporarily stored text on ChatGPT pages and tries to place it into the prompt box.
+- The script only reads temporarily stored text on the automatically opened ChatGPT tab with the matching one-time token.
+- If you manually open a new ChatGPT tab later, leftover temporary text is cleared instead of being filled into the prompt box.
 - The script never sends the prompt automatically.
 - Long selections are not truncated.
 - If automatic filling fails because the ChatGPT interface changed, the script copies the text to the clipboard and asks you to press `Ctrl+V` manually.

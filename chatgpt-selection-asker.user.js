@@ -3,7 +3,7 @@
 // @name:en      ChatGPT Selection Asker
 // @name:zh-TW   ChatGPT 選取詢問器
 // @namespace    https://github.com/meng0224/chatgpt-selection-asker
-// @version      0.1.5
+// @version      0.1.6
 // @description  Select text on a webpage, right-click, and send it to ChatGPT as a prefilled prompt.
 // @description:en Select text on a webpage, right-click, and send it to ChatGPT as a prefilled prompt.
 // @description:zh-TW 在網頁上選取文字後，右鍵送到 ChatGPT 作為預填提示詞。
@@ -27,6 +27,8 @@
   const MAX_PREFILL_URL_LENGTH = 2000;
   const PENDING_TEXT_KEY = "pendingChatGptSelectionText";
   const PENDING_TEXT_CREATED_AT_KEY = "pendingChatGptSelectionCreatedAt";
+  const PENDING_TEXT_TOKEN_KEY = "pendingChatGptSelectionToken";
+  const PENDING_TEXT_FRAGMENT_PREFIX = "chatgpt-selection-asker=";
   const PENDING_TEXT_TTL_MS = 5 * 60 * 1000;
   const PROMPT_WAIT_TIMEOUT_MS = 15000;
   const PROMPT_SELECTOR =
@@ -106,6 +108,12 @@
     return url.toString();
   }
 
+  function buildPendingChatGptUrl(token) {
+    const url = new URL(CHATGPT_URL);
+    url.hash = `${PENDING_TEXT_FRAGMENT_PREFIX}${encodeURIComponent(token)}`;
+    return url.toString();
+  }
+
   function openChatGptUrl(targetUrl) {
     if (typeof GM_openInTab === "function") {
       GM_openInTab(targetUrl, {
@@ -121,6 +129,15 @@
 
   function canPrefillWithUrl(text) {
     return buildChatGptUrl(text).length <= MAX_PREFILL_URL_LENGTH;
+  }
+
+  function createPendingChatGptToken() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+
+    const randomPart = Math.random().toString(36).slice(2);
+    return `${Date.now().toString(36)}-${randomPart}`;
   }
 
   function copyToClipboard(text) {
@@ -139,23 +156,46 @@
 
   function setPendingChatGptText(text) {
     if (typeof GM_setValue !== "function") {
-      return false;
+      return "";
     }
+
+    const token = createPendingChatGptToken();
 
     GM_setValue(PENDING_TEXT_KEY, text);
     GM_setValue(PENDING_TEXT_CREATED_AT_KEY, Date.now());
-    return true;
+    GM_setValue(PENDING_TEXT_TOKEN_KEY, token);
+    return token;
   }
 
-  function getPendingChatGptText() {
+  function getChatGptPendingTokenFromUrl() {
+    const hash = location.hash.slice(1);
+
+    if (!hash.startsWith(PENDING_TEXT_FRAGMENT_PREFIX)) {
+      return "";
+    }
+
+    try {
+      return decodeURIComponent(hash.slice(PENDING_TEXT_FRAGMENT_PREFIX.length));
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function getPendingChatGptText(expectedToken) {
     if (typeof GM_getValue !== "function") {
       return "";
     }
 
     const text = GM_getValue(PENDING_TEXT_KEY, "");
     const createdAt = GM_getValue(PENDING_TEXT_CREATED_AT_KEY, 0);
+    const storedToken = GM_getValue(PENDING_TEXT_TOKEN_KEY, "");
 
     if (!text) {
+      return "";
+    }
+
+    if (!expectedToken || storedToken !== expectedToken) {
+      clearPendingChatGptText();
       return "";
     }
 
@@ -168,12 +208,19 @@
   }
 
   function clearPendingChatGptText() {
+    if (typeof GM_setValue === "function") {
+      GM_setValue(PENDING_TEXT_KEY, "");
+      GM_setValue(PENDING_TEXT_CREATED_AT_KEY, 0);
+      GM_setValue(PENDING_TEXT_TOKEN_KEY, "");
+    }
+
     if (typeof GM_deleteValue !== "function") {
       return;
     }
 
     GM_deleteValue(PENDING_TEXT_KEY);
     GM_deleteValue(PENDING_TEXT_CREATED_AT_KEY);
+    GM_deleteValue(PENDING_TEXT_TOKEN_KEY);
   }
 
   function notify(message) {
@@ -206,15 +253,15 @@
       return "prefill";
     }
 
-    const stored = setPendingChatGptText(text);
-    openChatGptUrl(CHATGPT_URL);
+    const token = setPendingChatGptText(text);
+    openChatGptUrl(token ? buildPendingChatGptUrl(token) : CHATGPT_URL);
 
-    if (!stored) {
+    if (!token) {
       copyToClipboard(text);
       notify("ChatGPT opened, but temporary storage failed. Paste the copied text manually.");
     }
 
-    return stored ? "stored" : "storage-failed";
+    return token ? "stored" : "storage-failed";
   }
 
   function openSelectedTextInChatGpt() {
@@ -286,7 +333,8 @@
   }
 
   async function fillPendingTextOnChatGpt() {
-    const text = getPendingChatGptText();
+    const token = getChatGptPendingTokenFromUrl();
+    const text = getPendingChatGptText(token);
 
     if (!text) {
       return;
