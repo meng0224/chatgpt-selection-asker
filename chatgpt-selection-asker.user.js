@@ -328,7 +328,7 @@
 
     if (input && fillPromptInput(input, text)) {
       clearPendingChatGptText();
-      notify("已自動填入 ChatGPT，請確認內容後再送出。");
+      notify("Automatically filled by ChatGPT. Please review the content before submitting.");
       return;
     }
 
