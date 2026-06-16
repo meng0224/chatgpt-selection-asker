@@ -3,7 +3,7 @@
 // @name:en      ChatGPT Selection Asker
 // @name:zh-TW   ChatGPT 選取詢問器
 // @namespace    https://github.com/meng0224/chatgpt-selection-asker
-// @version      0.1.6
+// @version      0.1.7
 // @description  Select text on a webpage, right-click, and send it to ChatGPT as a prefilled prompt.
 // @description:en Select text on a webpage, right-click, and send it to ChatGPT as a prefilled prompt.
 // @description:zh-TW 在網頁上選取文字後，右鍵送到 ChatGPT 作為預填提示詞。
